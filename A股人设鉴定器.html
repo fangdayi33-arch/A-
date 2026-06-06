@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>A股人设鉴定器</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#f5f0eb;--card:#fff;--text:#1d1d1f;--text2:#86868b;--text3:#aeaeb2;--accent:#1d1d1f;--radius:0px;--shadow:none}
+    html,body{height:100%;font-family:"Courier New","PingFang SC","Microsoft YaHei",monospace;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+    body{overflow:hidden}
+    .app{height:100vh;height:100dvh;max-width:500px;margin:0 auto;position:relative;overflow:hidden;background:var(--bg)}
+    .page{position:absolute;inset:0;display:flex;flex-direction:column;padding:0 20px;transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .35s ease;overflow-y:auto;-webkit-overflow-scrolling:touch}
+    .page.hidden{transform:translateX(36px);opacity:0;pointer-events:none}
+    .page::-webkit-scrollbar{display:none}
+    .page{-ms-overflow-style:none;scrollbar-width:none}
+
+    #cover{justify-content:center;align-items:center;text-align:center;padding:36px 20px 28px;background:#f5f0eb;position:relative;overflow:hidden}
+    #cover .kline-bg{position:absolute;inset:0;opacity:.12;pointer-events:none}
+    #cover .kline-bg svg{width:100%;height:100%}
+    .cb{display:inline-flex;align-items:center;gap:5px;background:rgba(0,0,0,.04);border:1px solid rgba(0,0,0,.06);padding:4px 11px;font-size:10px;color:rgba(0,0,0,.4);margin-bottom:22px;font-weight:600;letter-spacing:1.5px}
+    .ci{font-size:54px;margin-bottom:10px;position:relative;z-index:1}
+    #cover h1{font-size:34px;font-weight:900;letter-spacing:-1px;line-height:1.15;margin-bottom:6px;color:#1a1a1a;position:relative;z-index:1}
+    #cover .sub{font-size:13px;color:rgba(0,0,0,.45);line-height:1.6;position:relative;z-index:1;letter-spacing:.3px}
+    .ct{display:flex;flex-wrap:wrap;justify-content:center;gap:3px;margin:14px 0 26px;max-width:340px;position:relative;z-index:1}
+    .ct span{background:rgba(0,0,0,.03);border:1px solid rgba(0,0,0,.05);padding:3px 7px;font-size:10px;color:rgba(0,0,0,.4)}
+
+    .qh{display:flex;align-items:center;gap:12px;padding:16px 0 4px;flex-shrink:0}
+    .qp{flex:1;height:4px;background:rgba(0,0,0,.06);overflow:hidden}
+    .qf{height:100%;background:#1a1a1a;transition:width .35s ease}
+    .qc{font-size:13px;color:var(--text2);font-weight:500;white-space:nowrap}
+
+    .qb{flex:1;display:flex;flex-direction:column;justify-content:center;padding:8px 0 16px}
+    .qt{font-size:18px;font-weight:600;line-height:1.55;margin-bottom:24px;letter-spacing:-.2px}
+    .qo{display:flex;flex-direction:column;gap:9px}
+    .qopt{background:var(--card);border:1px solid rgba(0,0,0,.06);padding:13px 15px;font-size:14px;line-height:1.5;cursor:pointer;transition:all .1s ease;text-align:left;color:var(--text);-webkit-tap-highlight-color:transparent}
+    .qopt:active{transform:scale(.985)}
+    .qopt.selected{border-color:#1a1a1a;background:rgba(0,0,0,.02)}
+    .qopt-inner{display:flex;align-items:flex-start;gap:10px}
+    .ql{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border:1px solid rgba(0,0,0,.12);font-size:10px;font-weight:700;flex-shrink:0;margin-top:2px;color:var(--text3)}
+    .qopt.selected .ql{border-color:#1a1a1a;color:#1a1a1a;background:#1a1a1a;color:#fff}
+
+    .qf2{padding:8px 0 20px;flex-shrink:0}
+    .btn{display:flex;align-items:center;justify-content:center;width:100%;padding:14px;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;transition:all .12s ease;-webkit-tap-highlight-color:transparent}
+    .btn:active{transform:scale(.97)}
+    .btn-jelly{font-size:17px;padding:16px 0;background:#1a1a1a;color:#fff;border-radius:999px;font-weight:700;letter-spacing:1px;position:relative;z-index:1;transition:transform .2s cubic-bezier(.34,1.56,.64,1),box-shadow .2s ease;box-shadow:0 4px 14px rgba(0,0,0,.08);-webkit-tap-highlight-color:transparent;cursor:pointer;border:none;width:100%;display:flex;align-items:center;justify-content:center;font-family:inherit}
+    .btn-jelly:hover{transform:scale(1.02);box-shadow:0 6px 20px rgba(0,0,0,.1)}
+    .btn-jelly:active{transform:scale(.96);transition-duration:.08s}
+    .btn-primary{background:#1a1a1a;color:#fff}
+    .btn-primary:disabled{opacity:.3;cursor:not-allowed;transform:none}
+    .btn-outline{background:var(--card);color:var(--text);border:1px solid rgba(0,0,0,.06)}
+
+    .calc-overlay{position:absolute;inset:0;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:50;transition:opacity .35s ease}
+    .calc-overlay.hidden{opacity:0;pointer-events:none}
+    .calc-spinner{width:32px;height:32px;border:3px solid #e5e5ea;border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .calc-text{margin-top:14px;font-size:15px;color:var(--text2);text-align:center}
+
+    #result{background:var(--bg);padding:16px;min-height:100vh}
+    .rc{background:var(--card);padding:24px 18px 20px;text-align:left;border:1px solid rgba(0,0,0,.04);margin-bottom:14px}
+    .rc-badge{font-size:10px;color:var(--text3);border:1px solid rgba(0,0,0,.06);display:inline-block;padding:3px 9px;margin-bottom:16px;letter-spacing:1px}
+    .rc-icon-wrap{display:flex;justify-content:center;margin-bottom:12px}
+    .rc-icon-badge{width:140px;height:140px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+    .rc-icon-badge img{width:100%;height:100%;object-fit:contain;display:block}
+
+    /* === Hero Reveal === */
+    .hero-overlay{position:absolute;inset:0;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.85);pointer-events:none;opacity:0;transition:opacity .5s ease}
+    .hero-overlay.active{opacity:1;pointer-events:auto}
+    .hero-overlay .hero-card{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:48px 36px;background:linear-gradient(160deg,#1a1a1a,#2d2d2d);border:1px solid rgba(255,215,0,.2);width:92%;max-width:440px;position:relative}
+    .hero-overlay .hero-card::before{content:'';position:absolute;inset:-3px;background:linear-gradient(135deg,rgba(255,215,0,.5),rgba(255,215,0,.1),rgba(255,215,0,.5),rgba(255,215,0,.05));z-index:-1;filter:blur(10px);animation:heroGlow 2.5s ease-in-out infinite alternate}
+    @keyframes heroGlow{0%{opacity:.6;filter:blur(8px)}100%{opacity:1;filter:blur(16px)}}
+    .hero-overlay .hero-img{width:240px;height:240px;margin-bottom:20px;opacity:0;transform:scale(.3) rotateY(90deg);position:relative}
+    .hero-overlay .hero-img img{width:100%;height:100%;object-fit:contain;display:block}
+    .hero-overlay .hero-img.active{animation:heroFlipIn 1.8s cubic-bezier(.34,1.56,.64,1) forwards}
+    @keyframes heroFlipIn{
+      0%{opacity:0;transform:scale(.3) rotateY(90deg)}
+      40%{opacity:1;transform:scale(1.15) rotateY(-15deg)}
+      60%{transform:scale(.95) rotateY(5deg)}
+      80%{transform:scale(1.02) rotateY(-2deg)}
+      100%{opacity:1;transform:scale(1) rotateY(0deg)}
+    }
+    .hero-overlay .hero-name{font-size:38px;font-weight:900;color:#fff;margin-bottom:6px;opacity:0;transform:translateY(20px);letter-spacing:-1px}
+    .hero-overlay .hero-name.active{animation:fadeUp .6s ease .9s forwards}
+    .hero-overlay .hero-tagline{font-size:17px;color:rgba(255,215,0,.7);margin-bottom:24px;opacity:0;transform:translateY(20px)}
+    .hero-overlay .hero-tagline.active{animation:fadeUp .6s ease 1.1s forwards}
+    .hero-overlay .hero-desc{padding:12px 16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);font-size:13px;color:rgba(255,255,255,.55);line-height:1.6;opacity:0;transform:translateY(20px);width:100%}
+    .hero-overlay .hero-desc.active{animation:fadeUp .6s ease 1.3s forwards}
+    @keyframes fadeUp{0%{opacity:0;transform:translateY(20px)}100%{opacity:1;transform:translateY(0)}}
+    .hero-overlay .hero-shrink{position:absolute;bottom:40px;font-size:12px;color:rgba(255,255,255,.2);opacity:0;animation:fadeIn 1s ease 2.5s forwards}@keyframes fadeIn{to{opacity:1}}
+    .rc-name{font-size:26px;font-weight:900;letter-spacing:-.5px;margin-bottom:3px;color:var(--text);text-align:center}
+    .rc-tagline{font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:18px;padding:0 8px}
+    .rc-divider{height:1px;background:rgba(0,0,0,.06);margin:0 16px 14px}
+    .rc-bars{margin-top:14px;display:flex;flex-direction:column;gap:4px}
+    .rc-item{padding:6px 0;border-bottom:1px solid rgba(0,0,0,.04)}
+    .rc-item:last-child{border-bottom:none}
+    .rc-item-row{display:flex;justify-content:space-between;align-items:center}
+    .rc-item-name{font-size:13px;font-weight:600;display:flex;align-items:center;gap:4px}
+    .rc-item-name .e{font-size:14px}
+    .rc-item-score{font-size:12px;font-weight:600}
+    .rc-item-desc{font-size:11px;color:var(--text3);margin-top:2px;line-height:1.4;padding-left:18px}
+    .rc-item-track{height:6px;background:rgba(0,0,0,.04);margin-top:6px;overflow:hidden;border-radius:3px}
+    .rc-item-fill{height:100%;transition:width .8s ease;border-radius:3px;box-shadow:inset 0 1px 0 rgba(255,255,255,.15)}
+
+    .pw{background:var(--card);padding:22px 20px;text-align:center;border:1px solid rgba(0,0,0,.04);margin-bottom:14px}
+    .pw-title{font-size:17px;font-weight:700;margin-bottom:5px}
+    .pw-desc{font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:14px}
+    .pw-price{display:flex;align-items:baseline;justify-content:center;gap:2px;margin-bottom:14px}
+    .pw-price .sym{font-size:16px;color:var(--text2)}
+    .pw-price .amt{font-size:40px;font-weight:800;color:var(--text)}
+    .pw-price .orig{font-size:14px;color:var(--text3);text-decoration:line-through;margin-left:6px}
+    .pw-perks{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:14px}
+    .pw-perk{background:rgba(0,0,0,.03);padding:8px 6px;font-size:12px;color:var(--text2);border:1px solid rgba(0,0,0,.04)}
+    .pw-note{font-size:11px;color:var(--text3);margin-top:8px}
+
+    .rs{background:var(--card);padding:18px;margin-bottom:12px;border:1px solid rgba(0,0,0,.04)}
+    .rs h3{font-size:15px;font-weight:700;margin-bottom:8px}
+    .rs p{font-size:13px;line-height:1.7;color:var(--text2)}
+
+    .sr{display:flex;gap:8px;margin-bottom:16px}
+    .sr .btn{flex:1}
+    .btn-share{background:var(--card);color:var(--text);border:1px solid rgba(0,0,0,.06)}
+    .btn-restart{background:transparent;color:var(--text2);border:1px solid rgba(0,0,0,.06)}
+
+    .toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--text);color:#fff;padding:11px 18px;font-size:13px;font-weight:500;transition:transform .35s cubic-bezier(.4,0,.2,1);z-index:100;white-space:nowrap;max-width:90vw}
+    .toast.show{transform:translateX(-50%) translateY(0)}
+
+    @media(max-width:374px){#cover h1{font-size:25px}.qt{font-size:16px}.qopt{padding:12px 13px;font-size:13px}}
+    @media(min-width:500px){.app{border-left:1px solid rgba(0,0,0,.04);border-right:1px solid rgba(0,0,0,.04)}}
+  </style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <div class="page" id="cover">
+    <div class="kline-bg">
+      <svg viewBox="0 0 400 600" preserveAspectRatio="none">
+        <!-- K线柱 -->
+        <line x1="20" y1="480" x2="20" y2="520" stroke="#22c55e" stroke-width="2"/>
+        <rect x="16" y="460" width="8" height="20" fill="#22c55e"/>
+        <line x1="40" y1="440" x2="40" y2="500" stroke="#ef4444" stroke-width="2"/>
+        <rect x="36" y="420" width="8" height="20" fill="#ef4444"/>
+        <line x1="60" y1="460" x2="60" y2="510" stroke="#22c55e" stroke-width="2"/>
+        <rect x="56" y="440" width="8" height="20" fill="#22c55e"/>
+        <line x1="80" y1="430" x2="80" y2="490" stroke="#ef4444" stroke-width="2"/>
+        <rect x="76" y="410" width="8" height="20" fill="#ef4444"/>
+        <line x1="100" y1="450" x2="100" y2="480" stroke="#ef4444" stroke-width="2"/>
+        <rect x="96" y="430" width="8" height="20" fill="#ef4444"/>
+        <line x1="120" y1="470" x2="120" y2="520" stroke="#22c55e" stroke-width="2"/>
+        <rect x="116" y="450" width="8" height="20" fill="#22c55e"/>
+        <line x1="140" y1="420" x2="140" y2="470" stroke="#ef4444" stroke-width="2"/>
+        <rect x="136" y="400" width="8" height="20" fill="#ef4444"/>
+        <line x1="160" y1="440" x2="160" y2="490" stroke="#ef4444" stroke-width="2"/>
+        <rect x="156" y="420" width="8" height="20" fill="#ef4444"/>
+        <line x1="180" y1="460" x2="180" y2="500" stroke="#22c55e" stroke-width="2"/>
+        <rect x="176" y="440" width="8" height="20" fill="#22c55e"/>
+        <line x1="200" y1="430" x2="200" y2="480" stroke="#22c55e" stroke-width="2"/>
+        <rect x="196" y="410" width="8" height="20" fill="#22c55e"/>
+        <line x1="220" y1="450" x2="220" y2="510" stroke="#ef4444" stroke-width="2"/>
+        <rect x="216" y="430" width="8" height="20" fill="#ef4444"/>
+        <line x1="240" y1="470" x2="240" y2="530" stroke="#22c55e" stroke-width="2"/>
+        <rect x="236" y="450" width="8" height="20" fill="#22c55e"/>
+        <line x1="260" y1="410" x2="260" y2="460" stroke="#ef4444" stroke-width="2"/>
+        <rect x="256" y="390" width="8" height="20" fill="#ef4444"/>
+        <line x1="280" y1="440" x2="280" y2="500" stroke="#22c55e" stroke-width="2"/>
+        <rect x="276" y="420" width="8" height="20" fill="#22c55e"/>
+        <line x1="300" y1="420" x2="300" y2="480" stroke="#ef4444" stroke-width="2"/>
+        <rect x="296" y="400" width="8" height="20" fill="#ef4444"/>
+        <line x1="320" y1="460" x2="320" y2="510" stroke="#22c55e" stroke-width="2"/>
+        <rect x="316" y="440" width="8" height="20" fill="#22c55e"/>
+        <line x1="340" y1="430" x2="340" y2="490" stroke="#ef4444" stroke-width="2"/>
+        <rect x="336" y="410" width="8" height="20" fill="#ef4444"/>
+        <line x1="360" y1="450" x2="360" y2="520" stroke="#ef4444" stroke-width="2"/>
+        <rect x="356" y="430" width="8" height="20" fill="#ef4444"/>
+        <line x1="380" y1="440" x2="380" y2="480" stroke="#22c55e" stroke-width="2"/>
+        <rect x="376" y="420" width="8" height="20" fill="#22c55e"/>
+        <!-- 移动平均线 -->
+        <polyline points="20,480 40,460 60,470 80,440 100,450 120,470 140,430 160,440 180,460 200,440 220,460 240,480 260,430 280,450 300,440 320,460 340,450 360,470 380,450" fill="none" stroke="rgba(0,0,0,.15)" stroke-width="1.5"/>
+        <polyline points="20,490 40,470 60,485 80,460 100,465 120,490 140,450 160,460 180,475 200,460 220,475 240,495 260,450 280,470 300,460 320,480 340,470 360,485 380,465" fill="none" stroke="rgba(0,0,0,.08)" stroke-width="1"/>
+        <!-- 箭头标注 -->
+        <polyline points="56,440 80,440 80,410" fill="none" stroke="rgba(239,68,68,.5)" stroke-width="1.5" stroke-dasharray="3,2"/>
+        <polygon points="80,408 76,416 84,416" fill="rgba(239,68,68,.5)"/>
+        <polyline points="136,400 160,400 200,410" fill="none" stroke="rgba(34,197,94,.5)" stroke-width="1.5" stroke-dasharray="3,2"/>
+        <polygon points="200,408 196,416 204,416" fill="rgba(34,197,94,.5)"/>
+        <polyline points="256,390 280,390 300,400" fill="none" stroke="rgba(34,197,94,.5)" stroke-width="1.5" stroke-dasharray="3,2"/>
+        <polygon points="300,398 296,406 304,406" fill="rgba(34,197,94,.5)"/>
+        <line x1="40" y1="500" x2="80" y2="490" stroke="rgba(0,0,0,.08)" stroke-width="1" stroke-dasharray="2,3"/>
+        <line x1="260" y1="460" x2="300" y2="480" stroke="rgba(0,0,0,.08)" stroke-width="1" stroke-dasharray="2,3"/>
+        <!-- 趋势线 -->
+        <line x1="20" y1="490" x2="140" y2="420" stroke="rgba(0,0,0,.06)" stroke-width="1" stroke-dasharray="4,3"/>
+        <line x1="140" y1="420" x2="260" y2="410" stroke="rgba(0,0,0,.04)" stroke-width="1" stroke-dasharray="4,3"/>
+        <!-- 成交量 -->
+        <rect x="18" y="560" width="4" height="20" fill="rgba(34,197,94,.2)"/>
+        <rect x="38" y="565" width="4" height="15" fill="rgba(239,68,68,.2)"/>
+        <rect x="58" y="555" width="4" height="25" fill="rgba(34,197,94,.2)"/>
+        <rect x="78" y="568" width="4" height="12" fill="rgba(239,68,68,.2)"/>
+        <rect x="98" y="558" width="4" height="22" fill="rgba(239,68,68,.2)"/>
+        <rect x="118" y="562" width="4" height="18" fill="rgba(34,197,94,.2)"/>
+        <rect x="138" y="560" width="4" height="20" fill="rgba(239,68,68,.2)"/>
+        <rect x="158" y="566" width="4" height="14" fill="rgba(239,68,68,.2)"/>
+        <rect x="178" y="555" width="4" height="25" fill="rgba(34,197,94,.2)"/>
+        <rect x="198" y="560" width="4" height="20" fill="rgba(34,197,94,.2)"/>
+        <rect x="218" y="568" width="4" height="12" fill="rgba(239,68,68,.2)"/>
+        <rect x="238" y="558" width="4" height="22" fill="rgba(34,197,94,.2)"/>
+        <rect x="258" y="562" width="4" height="18" fill="rgba(239,68,68,.2)"/>
+        <rect x="278" y="556" width="4" height="24" fill="rgba(34,197,94,.2)"/>
+        <rect x="298" y="564" width="4" height="16" fill="rgba(239,68,68,.2)"/>
+        <rect x="318" y="558" width="4" height="22" fill="rgba(34,197,94,.2)"/>
+        <rect x="338" y="566" width="4" height="14" fill="rgba(239,68,68,.2)"/>
+        <rect x="358" y="560" width="4" height="20" fill="rgba(239,68,68,.2)"/>
+        <rect x="378" y="555" width="4" height="25" fill="rgba(34,197,94,.2)"/>
+      </svg>
+    </div>
+    <div class="cb"><span>📊</span> A股人设鉴定 · 2026</div>
+    <div class="ci">📈</div>
+    <h1>你在A股<br>属于哪个物种？</h1>
+    <p class="sub">20道灵魂拷问</p>
+    <p class="sub" style="font-size:12px;color:rgba(0,0,0,.4);margin-top:2px">测你在投研食物链的生态位</p>
+    <div class="ct">
+      <span>🌊定海神针</span>
+      <span>🧊山顶冻人</span>
+      <span>🎯Alpha猎手</span>
+      <span>👑回本帝</span>
+      <span>🪞人形反指</span>
+      <span>🍜关灯吃面</span>
+      <span>🪣抄底圣体</span>
+      <span>🚪销户再销户</span>
+    </div>
+    <button class="btn-jelly" onclick="start()">⚡ 开始鉴定</button>
+    <p style="font-size:11px;color:rgba(0,0,0,.35);margin-top:12px;letter-spacing:.5px;position:relative;z-index:1">约3分钟 · 已有 14,328 人完成了自我解剖</p>
+  </div>
+
+  <div class="page hidden" id="qPage">
+    <div class="qh">
+      <div class="qp"><div class="qf" id="qBar" style="width:5%"></div></div>
+      <span class="qc" id="qCount">1/20</span>
+    </div>
+    <div class="qb">
+      <div class="qt" id="qText"></div>
+      <div class="qo" id="qOpts"></div>
+    </div>
+    <div class="qf2">
+      <button class="btn btn-primary" id="qNext" disabled onclick="nextQ()" style="display:none">下一步 →</button>
+    </div>
+  </div>
+
+  <div class="calc-overlay hidden" id="calc">
+    <div class="calc-spinner"></div>
+    <p class="calc-text" id="calcText">🔮 分析你的A股基因…</p>
+  </div>
+
+  <div class="page hidden" id="result">
+    <!-- Hero Reveal -->
+    <div class="hero-overlay" id="heroOverlay">
+      <div class="hero-card">
+        <div class="hero-img" id="heroImg"></div>
+        <div class="hero-name" id="heroName"></div>
+        <div class="hero-tagline" id="heroTagline"></div>
+        <div class="hero-desc" id="heroDesc"></div>
+      </div>
+      <div class="hero-shrink">5秒后自动进入详情</div>
+    </div>
+    <div style="text-align:center;padding:14px 0 2px;font-size:10px;color:var(--text3);letter-spacing:2px">📋 鉴定结果</div>
+    <div class="rc" id="rc"></div>
+    <div id="fullR"></div>
+    <div class="sr">
+      <button class="btn btn-share" onclick="shareR()">📤 发朋友圈鉴定一下</button>
+      <button class="btn btn-restart" onclick="restart()">↺ 重新鉴定</button>
+    </div>
+    <div style="text-align:center;padding:8px 0 16px;font-size:9px;color:var(--text3);letter-spacing:.5px">本鉴定结果纯属娱乐 · 亏了别怪市场 · 要怪就怪这个测试</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+const P = {
+  '定海神针':{e:'🌊',t:'风浪见多了，自然就不慌了',c:'#1e40af',d:'你是那个在所有人慌乱时依然淡定的人——不是因为没看见风险，是见过的风浪太多了',
+   img:'定海神针.png'},
+  '山顶冻人':{e:'🧊',t:'我在山顶挺好的，就是有点冷',c:'#7c3aed',d:'永远买在最高点，永远在等"价值回归"',
+   img:'山顶冻人.png'},
+  'Alpha猎手':{e:'🎯',t:'市场不给我机会，我就自己找',c:'#059669',d:'你在数据里找规律，在噪音里找信号——虽然有时候找到的是过拟合的假信号，但你一直在找',
+   img:'Alpha猎手.png'},
+  '回本帝':{e:'👑',t:'从亏50%到回本，我用了三年',c:'#2563eb',d:'你最大的超能力不是赚钱——是从深套里爬出来之后，还敢继续玩',
+   img:'回本帝.png'},
+  '人形反指':{e:'🪞',t:'我刚割完它就涨停了',c:'#dc2626',d:'活的巴菲特效應——买啥啥跌，卖啥啥涨',
+   img:'人形反指.png'},
+  '关灯吃面':{e:'🍜',t:'关灯了，面还得吃',c:'#e11d48',d:'关灯不是为了省电，是不想看到账户余额——但面是无辜的，该吃还得吃',
+   img:'关灯吃面.png'},
+  '抄底圣体':{e:'🪣',t:'我觉得这个位置差不多了',c:'#0891b2',d:'你对底部的嗅觉比熊敏锐——虽然经常在半山腰就开始兴奋，但你永远不放弃抄底的梦想',
+   img:'抄底圣体.png'},
+  '销户再销户':{e:'🚪',t:'这次是真的不玩了……算了再试一次',c:'#4b5563',d:'销户五次没成功，开第八次的时候又觉得自己行了',
+   img:'销户再销户.png'}
+};
+
+const Q = [
+  {t:'晨会上，首席让你对下周市场发表看法，你其实这周根本没看盘。你会？',o:[
+    {t:'清清嗓子，从宏观讲到大类资产再讲到地缘政治，能讲半小时',s:{'定海神针':2,'回本帝':1}},
+    {t:'打开手机看一眼夜盘，现编一个观点',s:{'回本帝':2,'人形反指':1}},
+    {t:'复制一份友商的晨会观点改几个字发过去',s:{'Alpha猎手':2,'销户再销户':1}},
+    {t:'不说话，等首席自己把话说完',s:{'抄底圣体':2,'山顶冻人':1}}
+  ]},
+  {t:'你重仓的股票连续跌了5天，群里开始有人@你。你会？',o:[
+    {t:'"正常回调，技术性调整，不要慌"',s:{'定海神针':2,'抄底圣体':1}},
+    {t:'默默打开账户看一眼，关上，继续上班',s:{'销户再销户':2,'Alpha猎手':1}},
+    {t:'连夜写一篇深度报告证明这只票被低估了',s:{'回本帝':2,'人形反指':1}},
+    {t:'在量化模型里加了一个止损条件',s:{'Alpha猎手':2,'回本帝':1}}
+  ]},
+  {t:'一个全新概念横空出世——"低空经济AI机器人磁流体"。你第一反应是？',o:[
+    {t:'赶紧研究产业链，找核心标的，写报告',s:{'回本帝':2,'人形反指':2}},
+    {t:'先骂一句"又炒概念"，然后偷偷加自选',s:{'定海神针':2,'抄底圣体':1}},
+    {t:'看看有没有对应的ETF',s:{'销户再销户':2,'山顶冻人':1}},
+    {t:'用Python抓取所有社交媒体的关键词情绪',s:{'Alpha猎手':2,'回本帝':1}}
+  ]},
+  {t:'你买的股票突发公告："拟筹划重大资产重组，明日起停牌"。你？',o:[
+    {t:'兴奋得一晚上没睡着，开始算复牌后几个板',s:{'回本帝':2,'人形反指':2}},
+    {t:'"停吧，反正复牌也是跌"',s:{'定海神针':2,'抄底圣体':1}},
+    {t:'仔细读公告，分析重组成功概率和估值影响',s:{'山顶冻人':2,'回本帝':1}},
+    {t:'关掉软件，该干嘛干嘛',s:{'销户再销户':2,'Alpha猎手':1}}
+  ]},
+  {t:'朋友饭局上有人问你"最近有什么推荐的股票"。你会？',o:[
+    {t:'"投资有风险，入市需谨慎。我一般不推荐个股。"',s:{'定海神针':2,'销户再销户':1}},
+    {t:'压低声音说一个代码，然后补一句"别跟别人说"',s:{'回本帝':2,'人形反指':2}},
+    {t:'"我推荐的你敢买吗？我自己都不敢买。"',s:{'Alpha猎手':2,'抄底圣体':1}},
+    {t:'给他讲了一个因子模型和风险平价策略',s:{'Alpha猎手':2,'回本帝':1}}
+  ]},
+  {t:'大盘又双叒叕跌破3000点了。你此时的操作是？',o:[
+    {t:'加仓，越跌越买，这是定力的考验',s:{'定海神针':2,'抄底圣体':2}},
+    {t:'清仓观望，等企稳了再回来',s:{'Alpha猎手':2,'山顶冻人':1}},
+    {t:'赶紧看看我买的那个票有没有利空公告',s:{'回本帝':2,'人形反指':1}},
+    {t:'打开定投，这个点位不买白不买',s:{'销户再销户':2,'回本帝':1}}
+  ]},
+  {t:'你刷到一篇骂A股的文章，作者还是圈内人。你的反应是？',o:[
+    {t:'转发到群里，配文"真实"',s:{'人形反指':2,'回本帝':1}},
+    {t:'逐条分析他说的对不对，哪里情绪化了',s:{'定海神针':2,'山顶冻人':1}},
+    {t:'"骂完记得买"',s:{'抄底圣体':2,'销户再销户':1}},
+    {t:'这篇文章的阅读量和情绪指标可以做一个策略',s:{'Alpha猎手':2,'回本帝':1}}
+  ]},
+  {t:'出了个政策利好，你兴奋地冲进去，然后当天高开低走。你会？',o:[
+    {t:'"早盘追高的都是散户，真正的行情在后面"',s:{'定海神针':2,'抄底圣体':1}},
+    {t:'果然，A股的利好就是用来出货的',s:{'人形反指':2,'回本帝':1}},
+    {t:'分析今天的分时图，判断是洗盘还是见顶',s:{'回本帝':2,'人形反指':1}},
+    {t:'说明我的因子模型里应该加入政策落地日这个变量',s:{'Alpha猎手':2,'销户再销户':1}}
+  ]},
+  {t:'早上醒来，你第一个打开的APP是？',o:[
+    {t:'同花顺/东方财富——先看一眼夜盘和A50',s:{'回本帝':2,'人形反指':1}},
+    {t:'微信——看看群里有什么消息',s:{'回本帝':2,'定海神针':1}},
+    {t:'自选股APP——看看持仓有没有异常波动',s:{'山顶冻人':2,'抄底圣体':1}},
+    {t:'都不用打开，设了条件单通知',s:{'Alpha猎手':2,'销户再销户':1}}
+  ]},
+  {t:'你的自选股里占比最多的是？',o:[
+    {t:'茅台、招行、长江电力、中国神华——国之重器',s:{'定海神针':2,'抄底圣体':1}},
+    {t:'中际旭创、新易盛、天孚通信、寒武纪——成长才是王道',s:{'回本帝':2,'人形反指':2}},
+    {t:'各种ETF——宽基、行业、跨境，雨露均沾',s:{'销户再销户':2,'Alpha猎手':1}},
+    {t:'ST板块、北交所、次新股——高风险高收益',s:{'山顶冻人':2,'回本帝':1}}
+  ]},
+  {t:'收盘后你最常做的事是？',o:[
+    {t:'复盘今天的交易，写交易日志',s:{'Alpha猎手':2,'定海神针':1}},
+    {t:'看卖方报告，研究下一个机会',s:{'回本帝':2,'人形反指':1}},
+    {t:'看新闻联播和财经公众号',s:{'回本帝':2,'抄底圣体':1}},
+    {t:'关掉软件，享受生活',s:{'销户再销户':2,'山顶冻人':1}}
+  ]},
+  {t:'电梯里听到两个大妈在讨论股票，说"那个什么机器人概念可好了"。你？',o:[
+    {t:'忍不住纠正："机器人板块要细分，人形机器人和工业机器人不一样"',s:{'回本帝':2,'人形反指':2}},
+    {t:'竖起耳朵听听她们买了啥，反向操作',s:{'人形反指':2,'Alpha猎手':1}},
+    {t:'微笑不语，心想"这个位置进去就是接盘"',s:{'定海神针':2,'抄底圣体':1}},
+    {t:'查一下机器人ETF的规模变化',s:{'销户再销户':2,'回本帝':1}}
+  ]},
+  {t:'你对自己目前持仓的评价最接近？',o:[
+    {t:'"短期波动不改长期趋势，我看的是三年后"',s:{'定海神针':2,'抄底圣体':2}},
+    {t:'"方向对了，就是不知道什么时候启动"',s:{'回本帝':2,'人形反指':1}},
+    {t:'"这个月回撤有点大，但模型告诉我再等等"',s:{'Alpha猎手':2,'销户再销户':1}},
+    {t:'"已经被套了，等反弹就出"',s:{'山顶冻人':2,'回本帝':1}}
+  ]},
+  {t:'如果A股是一个人的性格，你觉得最像什么？',o:[
+    {t:'一个情绪不稳定的中年人——今天对你笑明天就翻脸',s:{'人形反指':2,'回本帝':1}},
+    {t:'一个宣称要减肥但半夜偷吃的中年人——说一套做一套',s:{'回本帝':2,'抄底圣体':1}},
+    {t:'一个每天都在"这次不一样"但每次都一样的渣男/女',s:{'定海神针':2,'人形反指':1}},
+    {t:'一个随波逐流的漂流者——没有方向就是它的方向',s:{'销户再销户':2,'Alpha猎手':1}}
+  ]},
+  {t:'有人问你:"这一轮你赚到钱了吗？"你真实的想法是？',o:[
+    {t:'"我没亏就不错了"',s:{'人形反指':2,'山顶冻人':1}},
+    {t:'"赚了一点，但还不够覆盖去年的亏"',s:{'回本帝':2,'Alpha猎手':1}},
+    {t:'"夏普1.3，但最大回撤18%"',s:{'Alpha猎手':2,'销户再销户':1}},
+    {t:'"看你怎么定义赚了"',s:{'定海神针':2,'回本帝':1}}
+  ]},
+  {t:'收盘后你发现持仓里有一只涨停了，第一反应是？',o:[
+    {t:'"终于轮到我了！"截图发朋友圈',s:{'回本帝':2,'人形反指':1}},
+    {t:'冷静分析涨停原因看龙虎榜',s:{'定海神针':2,'山顶冻人':1}},
+    {t:'"是不是我眼花？"确认三遍',s:{'人形反指':2,'销户再销户':1}},
+    {t:'检查模型为什么没提前买入',s:{'Alpha猎手':2,'抄底圣体':1}}
+  ]},
+  {t:'年底了，你打开年度收益总结，发现今年亏了15%。你会？',o:[
+    {t:'"没事，明年会好起来的"——然后关闭页面',s:{'定海神针':2,'销户再销户':1}},
+    {t:'逐月分析亏损原因，写一份2000字的年度复盘',s:{'回本帝':2,'Alpha猎手':1}},
+    {t:'"还好大盘跌了18%，我跑赢了大盘"',s:{'人形反指':2,'抄底圣体':1}},
+    {t:'截图发给朋友："你看我今年亏了多少"——然后朋友说他亏了20%',s:{'山顶冻人':2,'回本帝':1}}
+  ]},
+  {t:'你关注的一个大V发了一条付费文章，标题叫"下周必涨的三个方向"。你？',o:[
+    {t:'毫不犹豫打赏，看了再说',s:{'回本帝':2,'人形反指':2}},
+    {t:'先看免费部分，觉得有道理再付费',s:{'回本帝':2,'抄底圣体':1}},
+    {t:'"这种就是割韭菜的，不看"',s:{'定海神针':2,'Alpha猎手':1}},
+    {t:'等他下周复盘的时候看看他说的对不对——对了再追',s:{'山顶冻人':2,'销户再销户':1}}
+  ]},
+  {t:'你看到一只票从底部已经涨了30%了，但所有研报都说还能涨。你？',o:[
+    {t:'"涨了30%说明趋势确认了，追！"',s:{'回本帝':2,'人形反指':2}},
+    {t:'"都涨了30%了我还买什么，等回调"',s:{'定海神针':2,'抄底圣体':1}},
+    {t:'先买10%仓位，跌了再加仓',s:{'山顶冻人':2,'Alpha猎手':1}},
+    {t:'不看，已经涨了30%说明跟我没关系了',s:{'销户再销户':2,'回本帝':1}}
+  ]},
+  {t:'你觉得自己在A股坚持到现在，靠的是什么？',o:[
+    {t:'"不服输"——亏的钱总有一天会回来的',s:{'定海神针':2,'抄底圣体':2}},
+    {t:'"没办法"——钱套里面了，想走也走不了',s:{'人形反指':2,'销户再销户':1}},
+    {t:'"有瘾"——一天不打开交易软件浑身难受',s:{'回本帝':2,'山顶冻人':1}},
+    {t:'"信仰"——我相信A股会好的，虽然不知道什么时候',s:{'Alpha猎手':2,'回本帝':1}}
+  ]}
+];
+
+const LB = ['A','B','C','D'];
+
+let curQ=0, sel=[], sc={}, res={p:null,h:null}, unl=false;
+
+const $=id=>document.getElementById(id);
+
+function start(){
+  curQ=0;sel=[];sc={};Object.keys(P).forEach(k=>sc[k]=0);res={p:null,h:null};unl=false;
+  if(window._calcInterval)clearInterval(window._calcInterval);
+  // Reset hero overlay
+  const ov=$('heroOverlay');ov.classList.remove('active');
+  ov.style.transform='';ov.style.opacity='';ov.style.transition='';
+  ['heroImg','heroName','heroTagline','heroDesc'].forEach(id=>$(id).classList.remove('active'));
+  show('qPage');render();
+}
+
+function show(id){document.querySelectorAll('.page').forEach(p=>p.classList.toggle('hidden',p.id!==id));}
+
+function render(){
+  const q=Q[curQ];
+  $('qCount').textContent=`${curQ+1}/${Q.length}`;
+  $('qBar').style.width=`${((curQ+1)/Q.length)*100}%`;
+  $('qText').textContent=q.t;
+  const c=$('qOpts');c.innerHTML='';
+  q.o.forEach((o,i)=>{
+    const d=document.createElement('div');
+    d.className='qopt'+(sel[curQ]===i?' selected':'');
+    d.innerHTML=`<div class="qopt-inner"><span class="ql">${LB[i]}</span>${o.t}</div>`;
+    d.addEventListener('click',()=>pick(i));
+    c.appendChild(d);
+  });
+  $('qNext').disabled=sel[curQ]===undefined;
+  $('qNext').textContent=curQ===Q.length-1?'🔮 看看我是什么物种':'下一步 →';
+}
+
+function pick(i){
+  sel[curQ]=i;
+  document.querySelectorAll('.qopt').forEach((c,j)=>c.classList.toggle('selected',j===i));
+  $('qNext').disabled=false;
+  setTimeout(()=>nextQ(),200);
+}
+
+function nextQ(){
+  if(sel[curQ]===undefined)return;
+  const q=Q[curQ];const c=q.o[sel[curQ]];
+  Object.keys(c.s).forEach(k=>sc[k]+=c.s[k]);
+  if(curQ<Q.length-1){curQ++;render();}
+  else{show('result');$('calc').classList.remove('hidden');calcAnim();setTimeout(()=>{calcRes();renderR();$('calc').classList.add('hidden');if(window._calcInterval)clearInterval(window._calcInterval);},2000);}
+}
+
+function calcAnim(){
+  const msgs=['🔮 分析你的投资基因…','📊 计算你的亏钱姿势…','🔄 回测你的交易行为…','🧬 生成人设画像…'];
+  let i=0;const t=$('calcText');
+  if(window._calcInterval)clearInterval(window._calcInterval);
+  window._calcInterval=setInterval(()=>{i=(i+1)%msgs.length;t.textContent=msgs[i];},500);
+}
+
+function calcRes(){
+  const s=Object.entries(sc).sort((a,b)=>b[1]-a[1]);
+  res.p=s[0][0];res.h=s[1][0];
+  if(s[0][1]===s[1][1]&&s[2])res.h=s[2][0];
+}
+
+function renderR(){
+  const p=P[res.p],h=P[res.h];
+  if(!p||!h)return;
+  const s=Object.entries(sc).sort((a,b)=>b[1]-a[1]);
+  const mx=Math.max(...s.map(x=>x[1]),1);
+  let bars='';
+  s.forEach(([n,sc2])=>{
+    const info=P[n];const pct=Math.round((sc2/mx)*100);
+    const c=info?.c||'#5e5ce6';
+    bars+=`<div class="rc-item">
+      <div class="rc-item-row">
+        <div class="rc-item-name"><span class="e">${info?.e||''}</span>${n}</div>
+        <span class="rc-item-score" style="color:${c}">${sc2}分</span>
+      </div>
+      <div class="rc-item-desc">${info?.d||''}</div>
+      <div class="rc-item-track"><div class="rc-item-fill" style="width:${pct}%;background:${c}"></div></div>
+    </div>`;
+  });
+  // Build normal result card (hidden initially)
+  $('rc').innerHTML=`
+    <div class="rc-badge">📊 你的A股物种</div>
+    <div class="rc-icon-wrap"><div class="rc-icon-badge" style="background:${p.c}22">${p.img?`<img src="${p.img}" alt="${res.p}">`:p.e}</div></div>
+    <div class="rc-name">${res.p}</div>
+    <div class="rc-tagline">"${p.t}"</div>
+    <div style="margin:0 4px 16px;padding:8px 10px;background:rgba(0,0,0,.03);font-size:12px;color:var(--text2);line-height:1.5">${p.d||''}</div>
+    <div class="rc-divider"></div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+      <span style="font-size:12px;font-weight:600;color:var(--text)">🧬 你的成分分析</span>
+      <span style="font-size:10px;color:var(--text3)">得分越高说明你越接近这个物种</span>
+    </div>
+    <div class="rc-bars">${bars}</div>`;
+  // Show hero reveal first
+  showHero(p);
+  // Auto show full report after hero dismiss
+  setTimeout(()=>{showFull();},5600);
+  // Also allow click to show it sooner
+  const checkFull=setInterval(()=>{
+    if(!document.querySelector('.hero-overlay.active')){
+      try{showFull();}catch(e){}
+      clearInterval(checkFull);
+    }
+  },100);
+
+function showHero(p){
+  const overlay=$('heroOverlay');
+  const img=$('heroImg');
+  const name=$('heroName');
+  const tagline=$('heroTagline');
+  const desc=$('heroDesc');
+  // Set content
+  img.innerHTML=p.img?`<img src="${p.img}" alt="${res.p}">`:p.e;
+  name.textContent=res.p;
+  tagline.textContent=`"${p.t}"`;
+  desc.textContent=p.d||'';
+  overlay.classList.add('active');
+  // Sequence animations
+  setTimeout(()=>img.classList.add('active'),100);
+  setTimeout(()=>name.classList.add('active'),900);
+  setTimeout(()=>tagline.classList.add('active'),1100);
+  setTimeout(()=>desc.classList.add('active'),1300);
+  // Auto dismiss after 5s with shrink animation
+  let heroTimer=setTimeout(()=>{
+    dismissHero();
+  },5000);
+  function dismissHero(){
+    overlay.style.transition='opacity .6s ease,transform .6s ease';
+    overlay.style.transform='scale(.8)';
+    overlay.style.opacity='0';
+    setTimeout(()=>{
+      overlay.classList.remove('active');
+      overlay.style.transform='';
+      overlay.style.opacity='';
+      overlay.style.transition='';
+      [img,name,tagline,desc].forEach(el=>el.classList.remove('active'));
+    },600);
+  }
+  // Also allow click to dismiss early
+  overlay.onclick=function(){
+    clearTimeout(heroTimer);
+    dismissHero();
+  };
+}
+}
+
+function showFull(){
+  const dmap={
+    '定海神针':'你是这个团队里的定海神针。不是因为你有多厉害，是因为你经历得多——2007年的大盘涨停你见过，2015年的千股跌停你也见过，2018年的贸易战你扛过来了，2020年的疫情你也没跑掉。你最大的资产不是你的选股能力，是你的情绪稳定性。别人慌的时候你不慌——不是因为你比他们聪明，是因为你比他们老。\n\n你在圈内的外号是"行走的数据库"。你记不住新概念的名字——"低空经济"你记成"低空飞行"，"具身智能"你记成"具体智能"——但任何一个周期品的价格走势你都能脱口而出。晨会上你的发言永远是全场最安静的时刻，不是因为你讲得不好，是因为大家听不懂。但大盘暴跌的时候，你在群里说一句"不要慌"，所有人的焦虑真的缓解了30%。\n\n你在这个行业活了二十年，靠的不是运气，是别人都转行了你还在。你的朋友圈签名是"研究创造价值"——但你知道真正创造价值的不是你的研究，是你二十年如一日的在场。只要你不走，这个市场就还没有完全崩。',
+    '山顶冻人':'你的名字来源于一篇梁狗蛋的经典文章——《而你们，都是后面的0》。你深信自己是那个"1"，其他人都是跟在后面的"0"——没有你，他们一文不值。你是一家中小型公募的投资总监，管理规模50亿，但你觉得自己应该有500亿。你的口头禅是"我在这个市场里唯一相信的人就是我自己"——说完这句话之后的一个季度，你的产品亏了15%。\n\n你对每一个研究员报上来的股票都要亲自"把关"。你的把关方式是把研究员叫到办公室，问三个问题："你为什么觉得这个票能涨？你确定吗？你有多少仓位？"如果研究员说"我没买"，你就把报告扔回去。你坚信"屁股决定脑袋"——不重仓的推荐都是耍流氓。你自己确实做到了知行合一：你重仓的股票跌了，你也确实没跑。你的投资哲学非常统一：选好赛道、选好公司、满仓、死扛。\n\n你的另一个经典操作是每次开策略会都要讲一遍你的"人生投资三阶段论"——第一阶段是看山是山，第二阶段是看山不是山，第三阶段是看山还是山。"我现在是第三阶段"——但你每年的收益曲线看起来更像是"看山不是山"的那个阶段。办公室里的人私下叫你"老王"——不是因为你真的姓王，是因为梁狗蛋那篇文章里那个说"我是1"的人就叫老王。你也知道他们在叫你什么，你不在乎。因为你是1，他们是0。',
+    'Alpha猎手':'你是2024年PhD刚毕业，加入了某家券商的量化团队。你博士期间研究的是自然语言处理在金融文本中的应用，你以为你的技能会在华尔街大放异彩，结果你每天的工作是用Python拉数据、写SQL、修别人留下的bug。你的领导是一个不懂量化的老基金经理，他每次看到你的回测报告都会问一句"这个能赚钱吗？"——你每次都要解释一遍"超额收益不等于绝对收益"，然后看着他的表情从不耐烦变成困惑再变成不耐烦。\n\n你花了一个月搭建了一套多因子选股模型，回测年化收益28%，夏普比率2.1——你兴奋得发了一条LinkedIn。然后实盘跑了两个月，超额收益是-3.2%。你的解释是"市场风格发生了切换"——但你知道真正的原因是：你在回测的时候用了未来函数。你悄悄修掉了那个bug，重新跑了一遍，回测数据变成年化32%。你决定以这个版本为准重新实盘。你的领导问你"上次不是说亏了吗"，你说"那是上一个版本，这是2.0"。\n\n你的终极梦想是做出一个真正赚钱的模型，然后辞职去一家量化私募，拿carry，开保时捷。你现在拿的是月薪1万5的实习生工资，每天加班到十点，租住在离公司30分钟地铁的老破小里。但你的电脑里有47个版本的模型、300G的回测数据、和一张这辈子可能都用不上的金融工程PhD文凭。你觉得你欠的只是一个机会。你的模型说，机会早晚会来。alpha就在那里，只是信号太弱了。',
+    '回本帝':'你是这个市场里最顽强的那批人。你的A股生涯就像一部热血漫——开局被套50%，中期割肉在地板，后期靠着一股"我不信我赚不回来"的劲儿硬生生翻了身。你的手机相册里还存着当年那个-50%的截图，不是为了卖惨，是提醒自己曾经有多惨。\n\n你的操作风格非常统一：不赚钱就不走。你不需要赚多少，你只需要"回到那个数字"。你的目标价永远是你的成本价。到了就卖，绝不多拿一天。你的人生信条是：不亏就是赚，回本就是赢。\n\n你的朋友们都不理解你——他们在追求翻倍的时候，你只求回本。但你比他们都快乐，因为你的目标从来不难实现。你是这个市场里最容易满足的人，也是最不容易被打倒的人。因为你已经见过最低谷了，剩下的每一步都是向上。',
+    '人形反指':'你是这个市场里最特殊的存在——你是活的巴菲特效應。不是巴菲特的那种，是反向的那种：你买的每一只股票，都会在你买入之后的24小时内开始下跌。你曾经不信邪，做了一次对照实验：让你朋友用你的钱买一只你不看好的股票，结果那只股票涨了15%。你自己买的话，三天亏了8%。科学可以解释很多事情，但解释不了你的体质。\n\n你在圈内有一个传奇战绩：2023年你重仓买了某光模块龙头，买完第二天就出了减持公告，三天跌了20%。你割了之后发誓再也不碰光模块，然后2024年光模块涨了3倍。2025年你终于鼓起勇气在机器人板块启动的第一天买入了，这次没跌——第二天它涨了1%，然后第三天板块就崩了，你的票跌了12%。你的止损线是10%，所以你割了。割完之后它又涨了——涨了50%。\n\n你的朋友们专门为你拉了一个群，群名叫"反指观察室"。你每次买入操作他们都会截图存档，然后做反向操作。去年群里有三个人靠着反向跟单你，实现了20%以上的年化收益。他们集资给你买了一个锦旗，上面写着"你是我们最敬爱的明灯"。你没觉得这是讽刺，反而很自豪——毕竟不是每个人都有能力让一个群的人赚钱。你现在对自己的定位非常清晰：你不是一个投资者，你是一个市场反向风向标。你每买入一个股票，就意味着这个赛道的行情要结束了。你是周期之友、泡沫的掘墓人、接盘界的一面旗帜。',
+    '关灯吃面':'关灯吃面是A股最古老也最心酸的暗号——它意味着"我又亏光了"。但你不一样。你不仅关灯，你还真的在吃面。你的乐观主义和你的账户余额成反比：钱越少，心态越好。\n\n你的操作风格是"利好出尽我不出，利空来了我不怕"。你有一种近乎宗教般的信念——"只要我不卖，我就没亏"。你的持仓里可能有三只股票套了两年、五只套了一年、两只刚买。但你依然坚信：总有一天它们都会回来的。\n\n你最大的优点是情绪稳定——不管亏了多少，你都能淡定地吃完一碗面。你最大的缺点也是情绪稳定——该跑的时候你也在淡定地吃面。你的生活态度值得学习：在这个市场上，能吃下饭比能赚到钱更难。而你，两样都做到了——饭吃了，钱没了。',
+    '抄底圣体':'你的身体里住着一个永不言弃的抄底之魂。每一次下跌在你眼里都是机会——"又跌了？太好了，更便宜了！"你对底部的嗅觉比熊还敏锐，虽然大部分时候你在半山腰就开始兴奋了。但你的乐观主义是这个市场最稀缺的品质。\n\n你的自选股里全是"从高点跌了70%"的股票。你选股的逻辑非常简单：跌得越多=越有价值。你不知道什么是"下跌中继"，你只知道"跌了总会涨回来"。这个信念让你在2022年抄底中概互联、2023年抄底医药、2024年抄底新能源——你每一次都觉得自己抄到了黄金坑，然后发现下面还有十八层地狱。\n\n但你从来不改。因为你觉得"都跌了这么多了，还能跌到哪去？"——然后它就真能跌到哪去。不过没关系，你已经在计划下一次抄底了。你是这个市场最后的乐观主义者，是熊市里最温暖的那道光——虽然这道光的方向经常是反的。',
+    '销户再销户':'你的证券账户开户记录比你任何一段感情都长。你开过户8次、销过5次——每次销户你都觉得"这次真的结束了"，每次开户你都觉得"这次不一样"。你的手机相册里有4张销户截图，分别对应2019年、2021年、2023年和2024年。每一张截图都配着一段真情实感的小作文："再见了A股"、"这次我真的解脱了"、"六年了，我累了"——你每次写完都觉得这次是真的，但每次都是假的。\n\n最长的一次你坚持了8个月没看盘。那段时间你开始健身、学英语、周末去爬山。你觉得自己找到了人生的新意义。然后有一天在地铁上，你看到旁边一个人在同花顺上盯盘——你悄悄地瞥了一眼他的屏幕，发现那只股票涨停了。你的心跳漏了一拍。那天晚上你下载回了交易软件，第一件事是看看你的老仓位现在怎么样了——然后你发现你当初割肉的那只股票已经翻倍了。你沉默了很久，然后对自己说了一句："我就说吧，这个票是好票。"——完全忽略了你当时是因为受不了亏损才割的。你又开始交易了，带着一种"这次我一定要把失去的赚回来"的决心。你确实赚回来了一部分——在你又亏了更多之后。你的故事在这个市场里并不罕见。罕见的是你每一次销户的时候都觉得自己是第一次销户。你的银行卡密码是你的交易密码，你的交易密码是你前女友的生日。你俩分手之后你就再也没改过密码，因为你觉得改密码太麻烦了——就像销户一样，每次都说是最后一次，但每次都不是。'
+  };
+  const lmap={
+    '定海神针':'你的稳定是一把双刃剑——当市场好起来的时候，你比谁都稳；但市场变了的时候，你的"稳"就变成了"钝"。你永远在抄底，永远在半山腰。但你比谁都扛得住，因为你知道——只要不卖，就不算亏。你错过的不是机会，是你该迭代认知的时候选择了等。',
+    '山顶冻人':'你的亏钱姿势是一套完整的投资哲学：选赛道、选公司、满仓、死扛。你的问题是"死扛"那一步每次都出问题。你把自信当成了能力，把固执当成了坚持。你觉得市场错了的时候，市场从来不觉得自己错了。你在2021年的核心资产上亏了40%，你的解释是"市场风格不匹配"——但这个风格已经持续四年了。',
+    'Alpha猎手':'你太聪明了——聪明到可以在数据里找到任何你想要的结论。你的回测曲线漂亮得不像真的，因为它确实不是真的（你心里知道，但你不说）。你最大的敌人不是市场，是你对"完美模型"的执念。你离赚钱只差一步——放弃追求完美，接受"够用就行"。',
+    '回本帝':'你的勇气是你的超能力——你有勇气在亏了50%之后继续玩。但你的问题是你永远只追求"回到起点"，而不是"超越起点"。你的人生就是一轮又一轮的"被套→死扛→回本→卖出→再买入→再被套"。你不缺毅力，你缺的是"回本之后呢？"的答案。',
+    '人形反指':'你的亏钱姿势非常精准：你买的每一只股票都在涨停板附近。不是因为你追高，是你买的那个位置就是顶。你的选股方式非常独特：你打开涨幅榜，从涨最多的开始往下看。你的买入信号是"这个票今天涨得好，说明有资金关注了"——然后资金在你买入的当天就跑了。你的人生使命似乎是给别人做反向参考。你的朋友们通过反向跟单你赚了钱，集资给你买了锦旗——这面锦旗大概是你在A股唯一的正收益。',
+    '关灯吃面':'你的问题是你太能扛了。你以为你在做价值投资，其实你只是在做"被套股东"。你的人生就像一碗面——刚开始觉得香，吃到最后发现汤都凉了。你的"关灯"不是因为想省电，是因为你不忍心再看账户。但你从来没想过——关灯解决不了问题，看清楚了才能做决定。',
+    '抄底圣体':'你的问题不是抄底本身——是你永远在下跌途中就开始抄。你以为你在"买在无人问津处"，实际上你在"接飞刀"。你的选股逻辑只有一条：跌得够多了。但你从不算跌了多少才算"够多"——因为在你心里，永远都是"够多了"。你的优点是不恐惧，你的缺点是不该不恐惧的时候你也不恐惧。',
+    '销户再销户':'你的亏钱姿势是反复横跳。你在这个市场里进进出出，每次回来都带着"这次我一定行"的决心，然后重复上次的悲剧。你在最高点追进去，在最低点割出来，然后看着它涨回去、再追进去、再割出来——你的操作完美地实现了"高买低卖"。你的亏钱姿势是所有类型里最标准的——因为你把散户能犯的错误全犯了一遍。你不仅犯了，还犯了不止一遍。你不仅犯了不止一遍，还每次都发朋友圈宣告全世界。'
+  };
+  const wmap={
+    '定海神针':'1. 你的经验值钱，但你的偏见不值钱。你能一眼看穿90%的骗局——但你看不穿的那10%，亏的比90%赚的还多。\n2. 接受新东西。你不需要追概念，但你不能假装它们不存在。"低空经济"不是"低空飞行"——去了解一下，损失不了什么。\n3. 你已经到了该教别人的年纪了。收个徒弟，把经验传下去——教是最好的学。\n4. 学会认错。你的问题是大部分时候是对的，所以错的那几次你从来不认。\n5. 少看盘，多看书。你已经足够了解市场了，现在需要了解的是你自己。',
+    '山顶冻人':'1. 你不是1，你只是10086个基金经理中的一个。这个认知是让你不亏钱的开始。\n2. 在满仓之前，先问自己一个问题：如果这只股票明天跌停，我还会不会加仓？如果答案是"会"，你可以买；如果答案是"不会"，那你的仓位就太大了。\n3. 允许自己犯错。你的问题不是判断力有问题，是你每次都觉得自己是对的。给自己设一个止损线——15%，到了就认。这不是投降，这是纪律。\n4. 找一个跟你意见总是不一样的人——每次你想买的时候，先问问他怎么看。如果你听完他的分析之后还是想买，那就买。如果你开始犹豫了，那就等三天。\n5. 把你的"人生投资三阶段论"删了。你已经讲了四年了，没人想听了。',
+    'Alpha猎手':'1. 把因子数量从20个减到5个。你的问题不是因子不够多，是噪音太多。精简到5个最强的，跑不过基准你就认。\n2. 每周做一次手工交易——不看任何模型，只用K线。你会发现你的直觉比模型准——不是巧合，是你的直觉里有你没写进代码的信息。\n3. 去掉杠杆。你最大的回撤不是因为判断错了，是因为杠杆太高了。判断错了可以等，杠杆错了只能割。\n4. 接受一个现实：你的模型有保质期。优化的参数三个月就该更新一次——这不是bug，是特性。\n5. 你真的很聪明。但市场不缺聪明的人，缺的是聪明的、还能认错的人。',
+    '回本帝':'1. 你最大的问题不是亏钱，是不敢在回本之后继续持有。学会让利润奔跑——哪怕只跑10%就回头，也比永远在起跑线强。\n2. 给自己定一个规矩：回本之后至少持有两周再决定卖不卖。你会发现，有些票在你回本之后还能涨。\n3. 你的朋友圈签名不要再写"回本就行"了——因为你的潜意识会帮你实现这个目标，然后止步于此。\n4. 你经历的亏损让你比别人更懂风险，这是你的财富。但别忘了，你比别人更懂风险的同时，也要比别人更懂什么时候该承受风险。\n5. 你已经证明了你扛得住，现在该证明你拿得住了。',
+    '人形反指':'1. 你的体质不是诅咒，是信号。每次你想买的时候——等三天。如果三天后你还是想买，那就买。但大部分时候你三天之后就不想买了。\n2. 把你买入的截图发给你的朋友——不是让你朋友跟单，是让你朋友跟你说"别买"。你需要的不是买入建议，是刹车。\n3. 试试定向反向操作：每次你想买一个票的时候，去买它的同行——你买A奔着A跌，那B可能会涨。买个行业ETF也不错，因为你的体质可能不覆盖整个行业。\n4. 每个月最多交易两次。你的问题不是运气不好，是交易太多——你每次交易都在给市场送钱。\n5. 接受你的身份：你不是一个投资者，你是一个市场反向指标。这个身份也有价值——你的朋友圈子会因为你的存在而赚钱。你还可以收咨询费。',
+    '关灯吃面':'1. 关灯之前，先看一眼账户。不是让你折磨自己，是让你知道你的钱到底在经历什么。逃避解决不了问题，只会让你少吃几碗好面。\n2. 给自己的每一只持仓设一个止损线——15%就够了。到了就关灯吃面——但吃完之后要记得打开灯。\n3. 你最大的问题不是亏钱，是亏了钱之后什么都不做。亏损不可怕，可怕的是把"扛着"当成了策略。\n4. 下次吃面的时候问自己一个问题：如果这是我今天刚买的股票，我还愿意买吗？如果答案是"不"——那你就该卖了。\n5. 你不是没有赚钱的能力，你是没有"认错"的勇气。在这个市场上，认错不是丢人的事——吃冷面才是。',
+    '抄底圣体':'1. 在抄底之前，先问自己一个问题：如果这只股票再跌20%，你还敢不敢加仓？如果敢——那你现在的位置可能真的接近底部了。如果不敢——那你现在抄的就不是底。\n2. 把你的抄底线从"跌了多少"改成"跌到了什么估值"。PE分位数比跌幅百分比更有参考价值。\n3. 每个月只允许自己抄底一次。你太容易兴奋了——冷却期对你来说是救命的东西。\n4. 每次抄底之后写一句话记录你当时的心理状态。一个月后回看——你会发现大部分时候你的"这次不一样"其实都一样。\n5. 你的乐观是超能力，但超能力需要方向。不是所有下跌都是机会——有些下跌是在告诉你"你错了"。学会区分这两者，你就能从抄底圣体升级为抄底真神。',
+    '销户再销户':'1. 这次是真的。如果你已经销户超过三次——你不要再相信自己了。把你的账户密码给你最信任的人。不是让你把钱给别人管，是让你给自己增加一个操作的阻力。\n2. 把你删掉的交易软件下载回来——你今天晚上就想打开了对吧？这就对了。你需要的不是删软件，是需要明白你为什么会反复回来。\n3. 用一张纸写下你每次销户的原因和重新开户的原因。你会发现它们在重复。你第一次亏了钱销户，第二次亏了钱销户——但你重新开户的原因永远不是"我想明白了"，而是"我手痒了"。\n4. 你不是不适合炒股——你是太喜欢"开始"的感觉了。每一次重新开始都让你充满希望。但投资需要的不是"开始"的激情，是"坚持"的耐力。\n5. 把炒股省下来的时间去学一样新的东西。你会发现自己在这个市场里花了最多的时间、亏了最多的钱、得了最少的快乐。你的人生不应该只有A股。'
+  };
+  const qmap={
+    '定海神针':['"别慌，我经历过"','"这个我二十年前就见过"','"风浪越大鱼越贵"','"年轻人，稳一点"','"底部到了——这次是真的"'],
+    '山顶冻人':['"你们都是后面的0"','"我来说两句"','"这个票我看了很久了"','"我的判断不会错"','"市场错了"'],
+    'Alpha猎手':['"回测是完美的"','"再给我三个月迭代"','"风格切换了而已"','"我的模型没有问题"','"这次真的不一样——我的参数更新了"'],
+    '回本帝':['"回本我就走"','"这次不一样，我是认真的"','"等我回本了再也没人能伤害我"','"快了快了，还差两个点"','"终于回本了……咦怎么又跌了"'],
+    '人形反指':['"我刚买"','"又跌了"','"我不信它不涨"','"我再加仓"','"我刚割完它就涨停了"'],
+    '关灯吃面':['"关灯了"','"吃面了"','"明天会更好"','"不看了，爱咋咋地"','"面还是挺好吃的"'],
+    '抄底圣体':['"都跌了这么多了，差不多了"','"这次是真的底"','"再跌我就加仓"','"别人恐惧我贪婪"','"我已经在底部了"'],
+    '销户再销户':['"这次我真的不玩了"','"再给我一次机会"','"我不信A股永远不涨"','"我还就不信了这个邪"','"下次我一定管住手"']
+  };
+  const bmap={
+    '定海神针':'回本帝','山顶冻人':'人形反指','Alpha猎手':'回本帝','回本帝':'定海神针','人形反指':'山顶冻人','关灯吃面':'Alpha猎手','抄底圣体':'回本帝','销户再销户':'定海神针'
+  };
+  const fmap={
+    '定海神针':'定海神针在群里是那个"沉默的长者"。他不常发言，但每次发言都是一段59秒的语音。大盘暴跌的时候，他在群里说一句"不要慌"，所有人的焦虑真的缓解了30%。群里的人换了一茬又一茬，只有他的群名片从2017年到现在没变过。有时候你会嫌他啰嗦，但你也知道——如果哪天他不说话了，这个群就少了点什么。',
+    '山顶冻人':'他是群里的"话事人"。每次发言都自带主角光环——"我觉得""我认为""我判断"。他发的每一句话后面都会跟一个句号，像是给一个论点画上了句号。他在群里和人争论的时候从不退让——不是因为他说得对，是因为他声音大。他推荐的票经常被群里的"人形反指"反向操作，但他至今没发现这个规律。',
+    'Alpha猎手':'Alpha猎手是群里的"科学顾问"。每次发言大家都要查字典——"协整""GARCH""马尔可夫链"。他发一张回测曲线图，群里没人看得懂，但都会点赞。有一次他在群里讲风险平价策略，讲到第三句就没人理了。但他不在乎——他相信总有一天大家会明白他的厉害。大家确实相信他厉害——只是不敢跟他的模型下单。',
+    '回本帝':'回本帝是群里的"励志担当"。他的持仓永远在"被套→快回本了→又跌了"之间反复横跳。每次他说"还差两个点就回本了"，大家就知道他至少还要再熬两个月。但他从来不放弃——这种精神在群里感染了所有人。有人问他"你图什么"，他想了想说："我就想看看回本是什么感觉。"大家都沉默了，因为每个人都在等那个感觉。',
+    '人形反指':'他是群里的"红人"。每次他买入截图一发，群里就有人说"收到，马上做反方向"。他的操作记录被群友做成了一张Excel表——作为反向操作指南。他自己也知道这件事，但他很自豪，因为群里真的有人靠他赚了钱。他是全群唯一一个通过反向贡献实现社会价值的人。',
+    '关灯吃面':'关灯吃面是群里的"淡定哥"。大盘跌了5%的时候大家在骂，他在发吃面的照片；大盘跌了10%的时候大家在哭，他在发第二碗面的照片。他不怎么说话，但他的朋友圈每天更新一碗面——面越来越素，从加蛋到不加蛋到只剩清汤挂面。群里有人问他"你怎么还在吃面"，他说"只有面不会背叛我"。大家都沉默了，因为大家都懂。',
+    '抄底圣体':'抄底圣体是群里的"反向指标兼乐观源泉"。每次大盘跌了，别人在哀嚎，他在兴奋——"终于跌了！我等这个位置等了三个月！"他每次抄底都会截图发到群里，一个月后再看——大部分时候他截的是半山腰。但神奇的是，他从来不长记性。每次跌他都会重新燃起希望。群里的人从嘲笑他到羡慕他——不是羡慕他的收益，是羡慕他那种"永远相信明天会更好"的能力。在这个市场上，这种能力比赚钱更难能可贵。',
+    '销户再销户':'他是群里的"编制内演员"。每过几个月，他固定上演一出"销户大戏"——截图、发誓、告别。第一次大家会挽留，第三次大家开始打赌他什么时候回来。群里的盘口是：他最多坚持两个月——赔率是1:1.5，买"一个月内回来"的人最多。他自己也下注了。他买的"两个月以上"——因为他是乐观主义者。'
+  };
+  const c=$('fullR');c.style.display='block';
+  const best=bmap[res.p]||'定海神针';
+  const quotes=qmap[res.p]||['"我不玩了"','"把钱还我"'];
+  const friend=fmap[res.p]||'你们在一个群里，但很少聊天。';
+  const s=Object.entries(sc).sort((a,b)=>b[1]-a[1]);
+  const pScore=s.find(x=>x[0]===res.p);
+  const totalQ=Q.length;
+  const maxPossible=totalQ*2;
+  const pct=Math.round(((pScore?pScore[1]:0)/maxPossible)*100);
+  c.innerHTML=`
+    <div class="rs"><h3>🧬 深度人设解盘 · ${res.p}</h3><p style="white-space:pre-line">${dmap[res.p]||''}</p></div>
+    <div class="rs"><h3>⚡ 你的亏钱核心姿势</h3><p style="white-space:pre-line">${lmap[res.p]||''}</p></div>
+    <div class="rs"><h3>📊 人设浓度分析</h3><p>你在这份鉴定中的「${res.p}」浓度为 <strong>${pct}%</strong>（满分100%）。其余较高维度：</p><div class="rc-bars" style="margin-top:8px">${s.slice(1,5).map(([n,v])=>{
+      const info=P[n]||{};const pct2=Math.round((v/maxPossible)*100);const c2=info.c||'#5e5ce6';
+      return `<div class="rc-item">
+        <div class="rc-item-row">
+          <div class="rc-item-name"><span class="e">${info.e||''}</span>${n}</div>
+          <span class="rc-item-score" style="color:${c2}">${pct2}%</span>
+        </div>
+        <div class="rc-item-desc">${info.d||''}</div>
+        <div class="rc-item-track"><div class="rc-item-fill" style="width:${pct2}%;background:${c2}"></div></div>
+      </div>`;
+    }).join('')}</div></div>
+    <div class="rs"><h3>🎙️ 你的经典语录</h3><p>${quotes.map((q,i)=>`「${q}」`).join('  ')}</p><p style="margin-top:6px;color:var(--text3);font-size:12px">——你每次说这些话的时候都很真诚，这就很可怕了。</p></div>
+    <div class="rs"><h3>🩹 自救指南（认真版）</h3><p style="white-space:pre-line">${wmap[res.p]||''}</p></div>
+    <div class="rs"><h3>🤝 与你相克的人设</h3><p>在这个市场里，你最看不上的是 <strong>${best}</strong>（${P[best]?.e||''}）。你觉得他们的操作方式就是在送钱。奇怪的是——他们也觉得你在送钱。</p></div>
+    <div class="rs"><h3>👥 群友鉴</h3><p>${friend}</p></div>
+    <div class="rs" style="text-align:center"><p style="color:var(--text3);font-size:12px">📊 本鉴定结果纯属娱乐 · 亏了别怪市场 · 要怪就怪这个测试</p></div>
+  `;
+}
+
+function shareR(){
+  const p=P[res.p],h=P[res.h];
+  const t=`📊 我的A股人设鉴定结果\n\n我是【${res.p}】${p.e}\n"${p.t}"\n\n隐藏属性：${res.h} ${h.e}\n\n来测测你是什么物种 👉 [链接]`;
+  if(typeof navigator.share==='function')navigator.share({title:'A股人设鉴定器',text:t}).catch(()=>{});
+  else navigator.clipboard.writeText(t).then(()=>toast('📋 已复制，去发朋友圈鉴定一下你的朋友们吧！')).catch(()=>toast('截图发朋友圈吧 ✨'));
+}
+
+function restart(){
+  // Reset hero overlay
+  const ov=$('heroOverlay');ov.classList.remove('active');
+  ['heroImg','heroName','heroTagline','heroDesc'].forEach(id=>$(id).classList.remove('active'));
+  show('cover');
+}
+
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+</script>
+</body>
+</html>
